@@ -175,10 +175,8 @@ async def on_message(message: discord.Message):
 
     msg_len = len(message.content)
 
-    # 150+ karakter = 30 XP, altı = karakter başı 0.2 XP (5 harf = 1 XP)
+    # 150+ karakter = karakter başı 0.2 XP (5 harf = 1 XP), 149 ve altı = 0 XP
     if msg_len >= 150:
-        xp_gained = 30.0
-    elif msg_len >= 5:
         xp_gained = msg_len * 0.2
     else:
         return
@@ -209,7 +207,7 @@ async def bilgi(interaction: discord.Interaction):
     embed.add_field(name="💡 NEN & XP SİSTEMİ", value=(
         "• **Nen** statına puan dağıtınca her 1 Nen = **3 Teknik Puanı** kazanırsın.\n"
         "• **Nen Havuzu** ayrı bir stat, normal stat puanıyla geliştirilir.\n"
-        "• **XP:** 5+ karakter mesaj = karakter başı **0.2 XP** | 150+ karakter = **30 XP sabit**."
+        "• **XP:** 150+ karakter = karakter başı **0.2 XP** (5 harf = 1 XP) | 149 ve altı = **0 XP**."
     ), inline=False)
     embed.add_field(name="🛡️ YETKİLİ KOMUTLARI (Admin)", value=(
         "**`/kategori-ekle`** ➔ 10'a kadar kategori ekler.\n"
@@ -246,7 +244,7 @@ async def profil(interaction: discord.Interaction, kullanici: discord.Member = N
     embed = discord.Embed(color=discord.Color.dark_purple())
     desc = f"""```text
 ╔══════════════════════════════════════════════════════════════╗
-              ✦ DESTINY HxH | PROFİL: {p["character_name"]} ✦
+            ✦ DESTINY HxH | PROFİL: {p["character_name"]} ✦
    Discord: @{target.display_name} | Unvan: {unvan}
 ╠══════════════════════════════════════════════════════════════╣
  📜 KİMLİK & NEN
@@ -256,12 +254,12 @@ async def profil(interaction: discord.Interaction, kullanici: discord.Member = N
  • Boştaki Stat Puanı: 🌟 {p["unassigned_stats"]} | Teknik Puanı: ✨ {p.get("technique_points", 0)}
 
  ⚔️ FİZİKSEL STATLAR
- • 🥊 Güç:          [{p["strength"]:<3}]  {get_progress_bar(p["strength"])}
- • ⚡ Hız:          [{p["speed"]:<3}]  {get_progress_bar(p["speed"])}
+ • 🥊 Güç:         [{p["strength"]:<3}]  {get_progress_bar(p["strength"])}
+ • ⚡ Hız:         [{p["speed"]:<3}]  {get_progress_bar(p["speed"])}
  • 🛡️ Dayanıklılık: [{p["durability"]:<3}]  {get_progress_bar(p["durability"])}
 
  🧠 NEN STATLARI
- • 👁️ Nen:          [{p["willpower"]:<3}]  {get_progress_bar(p["willpower"])}
+ • 👁️ Nen:         [{p["willpower"]:<3}]  {get_progress_bar(p["willpower"])}
  • 🌊 Nen Havuzu:   [{p["nen_amount"]:<3}]  {get_progress_bar(p["nen_amount"])}
  • 🌀 Nen Hakimiyeti:[{p["nen_mastery"]:<3}]  {get_progress_bar(p["nen_mastery"])}
 ╠══════════════════════════════════════════════════════════════╣
