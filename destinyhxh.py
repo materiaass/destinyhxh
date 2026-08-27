@@ -108,7 +108,6 @@ class HxHBot(commands.Bot):
 
 bot = HxHBot()
 
-# --- YARDIMCI FONKSİYONLAR ---
 def get_progress_bar(value, max_val=100, length=10):
     if value <= 0: return "▱" * length
     filled = int((value / max_val) * length)
@@ -139,15 +138,12 @@ async def get_admin_roles(guild_id):
         return json.loads(row["admin_roles"])
 
 async def is_admin(interaction: discord.Interaction) -> bool:
-    # Sunucu yöneticisi her zaman geçer
     if interaction.user.guild_permissions.administrator:
         return True
-    # Kayıtlı admin rolleri
     admin_roles = await get_admin_roles(interaction.guild.id)
     user_role_ids = [r.id for r in interaction.user.roles]
     return any(rid in user_role_ids for rid in admin_roles)
 
-# --- MESAJ VE XP MOTORU ---
 @bot.event
 async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
@@ -175,7 +171,7 @@ async def on_message(message: discord.Message):
 
     msg_len = len(message.content)
 
-    # 150+ karakter = karakter başı 0.2 XP (5 harf = 1 XP), 149 ve altı = 0 XP
+    # 150+ karakter = karakter başı 0.2 XP, 149 altı = 0 XP
     if msg_len >= 150:
         xp_gained = msg_len * 0.2
     else:
@@ -187,7 +183,6 @@ async def on_message(message: discord.Message):
                             (xp_gained, xp_gained, message.author.id, message.guild.id))
     await bot.db.commit()
 
-# --- BİLGİ / REHBER ---
 @bot.tree.command(name="bilgi", description="Botun tüm komutlarını ve sistem rehberini gösterir.")
 async def bilgi(interaction: discord.Interaction):
     embed = discord.Embed(title="📖 Destiny HxH - Ultimate Sistem Rehberi", color=discord.Color.gold())
@@ -212,7 +207,7 @@ async def bilgi(interaction: discord.Interaction):
     embed.add_field(name="🛡️ YETKİLİ KOMUTLARI (Admin)", value=(
         "**`/kategori-ekle`** ➔ 10'a kadar kategori ekler.\n"
         "**`/kategori-cikar`** ➔ 10'a kadar kategoriyi çıkarır.\n"
-        "**`/karakter-olustur`** ➔ Oyuncuya profil açar.\n"
+        "**`/karakter-olustur`** ➔ Oyuncuya profil açar (15.000 Jenny başlangıç).\n"
         "**`/karakter-duzenle`** ➔ Karakter bilgilerini günceller.\n"
         "**`/stat-ayarla`** ➔ Statları doğrudan düzenler.\n"
         "**`/admin nen-sifirla`** ➔ Nen türünü sıfırlar.\n"
@@ -225,7 +220,6 @@ async def bilgi(interaction: discord.Interaction):
     ), inline=False)
     await interaction.response.send_message(embed=embed)
 
-# --- OYUNCU KOMUTLARI ---
 @bot.tree.command(name="profil", description="Karakter profilini, Nen ve statlarını görüntüler.")
 async def profil(interaction: discord.Interaction, kullanici: discord.Member = None):
     target = kullanici or interaction.user
@@ -330,7 +324,6 @@ async def learn_technique(interaction: discord.Interaction, teknik: str):
     await bot.db.commit()
     await interaction.response.send_message(f"🎉 **{t_name}** tekniğini öğrendin! `/teknik-dagit` ile puan verebilirsin.")
 
-# --- TEKNİK DAGIT ---
 class TeknikModal(discord.ui.Modal, title='Teknik Puanı Dağıt'):
     amount = discord.ui.TextInput(label='Eklenecek Puan', style=discord.TextStyle.short, placeholder='Örn: 5', required=True)
     def __init__(self, teknik_adi, mevcut_puan):
@@ -412,7 +405,6 @@ async def statcevir(interaction: discord.Interaction, miktar: str):
     await bot.db.commit()
     await interaction.response.send_message(f"🎉 `{deduct}` XP harcanarak **{points} Serbest Stat Puanı** kazanıldı.")
 
-# --- STAT DAGIT ---
 VALID_STATS = {
     "strength": "Güç",
     "speed": "Hız",
@@ -499,7 +491,6 @@ async def leaderboard(interaction: discord.Interaction):
     desc = "\n".join([f"**{i}.** <@{r['user_id']}> - **XP:** {int(r['current_xp'])}" for i, r in enumerate(rows, 1)])
     await interaction.response.send_message(embed=discord.Embed(title="🏆 Hunter Sıralaması", description=desc or "Kimse yok.", color=discord.Color.gold()))
 
-# --- SNİPE ---
 @bot.tree.command(name="snipe", description="Kullanıcının izinli kategorilerdeki son 5 mesajını gösterir (Sadece sana).")
 async def snipe(interaction: discord.Interaction, kullanici: discord.Member):
     allowed = await get_allowed_categories(interaction.guild.id)
@@ -521,7 +512,6 @@ async def snipe(interaction: discord.Interaction, kullanici: discord.Member):
     embed.set_footer(text="⚠️ Bu mesajlar sadece sana görünüyor.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# --- ROL VER (Sadece /rol-ver yazınca görünür, /bilgi'de yok) ---
 @bot.tree.command(name="rol-ver")
 @app_commands.default_permissions(administrator=True)
 async def rol_ver(
@@ -538,20 +528,16 @@ async def rol_ver(
     rol10: discord.Role = None
 ):
     secilen_roller = [r for r in [rol1, rol2, rol3, rol4, rol5, rol6, rol7, rol8, rol9, rol10] if r is not None]
-
     async with bot.db.execute("SELECT admin_roles FROM guild_settings WHERE guild_id = ?", (interaction.guild.id,)) as cursor:
         row = await cursor.fetchone()
         mevcut = json.loads(row["admin_roles"]) if row and row["admin_roles"] else []
-
     eklenenler = []
     for r in secilen_roller:
         if r.id not in mevcut:
             mevcut.append(r.id)
             eklenenler.append(r.name)
-
     if not eklenenler:
         return await interaction.response.send_message("⚠️ Seçilen roller zaten ekli.", ephemeral=True)
-
     if row:
         await bot.db.execute("UPDATE guild_settings SET admin_roles = ? WHERE guild_id = ?", (json.dumps(mevcut), interaction.guild.id))
     else:
@@ -559,7 +545,6 @@ async def rol_ver(
     await bot.db.commit()
     await interaction.response.send_message(f"✅ Admin rolleri eklendi: **{', '.join(eklenenler)}**", ephemeral=True)
 
-# --- YETKİLİ KOMUTLARI ---
 @bot.tree.command(name="kategori-ekle", description="[Yetkili] XP kazanılacak çoklu kategori ekler (10'a kadar).")
 @app_commands.default_permissions(administrator=True)
 async def kategori_ekle(
@@ -625,15 +610,17 @@ async def kategori_cikar(
     await bot.db.commit()
     await interaction.response.send_message(f"🗑️ Çıkarıldı: **{', '.join(cikarilanlar)}**", ephemeral=True)
 
-@bot.tree.command(name="karakter-olustur", description="[Yetkili] Kullanıcıya profil tanımlar.")
+@bot.tree.command(name="karakter-olustur", description="[Yetkili] Kullanıcıya profil tanımlar. (15.000 Jenny başlangıç)")
 @app_commands.default_permissions(administrator=True)
 async def karakter_olustur(interaction: discord.Interaction, kullanici: discord.Member, isim: str, boy: str, kilo: str, cinsiyet: str):
     if not await is_admin(interaction):
         return await interaction.response.send_message("❌ Bu komutu kullanma yetkin yok.", ephemeral=True)
-    await bot.db.execute("UPDATE players SET character_name = ?, height = ?, weight = ?, gender = ? WHERE user_id = ? AND guild_id = ?",
-                         (isim, boy, kilo, cinsiyet, kullanici.id, interaction.guild.id))
+    await bot.db.execute(
+        "UPDATE players SET character_name = ?, height = ?, weight = ?, gender = ?, money = 15000 WHERE user_id = ? AND guild_id = ?",
+        (isim, boy, kilo, cinsiyet, kullanici.id, interaction.guild.id)
+    )
     await bot.db.commit()
-    await interaction.response.send_message(f"✅ {kullanici.mention} için **{isim}** karakteri kaydedildi.")
+    await interaction.response.send_message(f"✅ {kullanici.mention} için **{isim}** karakteri kaydedildi. 💰 Başlangıç: **15.000 Jenny**")
 
 @bot.tree.command(name="karakter-duzenle", description="[Yetkili] Karakter bilgilerini günceller.")
 @app_commands.choices(alan=[
