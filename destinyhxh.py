@@ -62,12 +62,13 @@ class HxHBot(commands.Bot):
             await self.db.execute("ALTER TABLE guild_settings ADD COLUMN admin_roles TEXT DEFAULT '[]'")
         except Exception:
             pass
+        # Başlangıç parasını direkt DB seviyesinde 15000 yaptık
         await self.db.execute('''CREATE TABLE IF NOT EXISTS players (
             user_id INTEGER,
             guild_id INTEGER,
             current_xp REAL DEFAULT 0,
             total_earned_xp REAL DEFAULT 0,
-            money INTEGER DEFAULT 0,
+            money INTEGER DEFAULT 15000, 
             unassigned_stats INTEGER DEFAULT 0,
             character_name TEXT DEFAULT 'Bilinmiyor',
             height TEXT DEFAULT '-',
@@ -171,9 +172,9 @@ async def on_message(message: discord.Message):
 
     msg_len = len(message.content)
 
-    # 150+ karakter = karakter başı 0.2 XP, 149 altı = 0 XP
+    # 150 ve üstü için her 5 karaktere 1 XP (150 = 30XP, 155 = 31XP, sonsuza kadar artar)
     if msg_len >= 150:
-        xp_gained = msg_len * 0.2
+        xp_gained = round(msg_len * 0.2, 1)
     else:
         return
 
@@ -183,41 +184,36 @@ async def on_message(message: discord.Message):
                             (xp_gained, xp_gained, message.author.id, message.guild.id))
     await bot.db.commit()
 
-@bot.tree.command(name="bilgi", description="Botun tüm komutlarını ve sistem rehberini gösterir.")
+@bot.tree.command(name="bilgi", description="Botun komutlarını ve sistem rehberini gösterir.")
 async def bilgi(interaction: discord.Interaction):
-    embed = discord.Embed(title="📖 Destiny HxH - Ultimate Sistem Rehberi", color=discord.Color.gold())
+    embed = discord.Embed(title="📖 Destiny HxH - Sistem Rehberi", color=discord.Color.dark_theme())
+    
     embed.add_field(name="👤 OYUNCU KOMUTLARI", value=(
-        "**`/profil [kullanici]`** ➔ Karakter kartınızı, statları, XP ve Nen durumunu gösterir.\n"
-        "**`/nen-spin`** ➔ %5 Şansla Mütehassıs olmaya çalış (Sadece 1 Hak).\n"
-        "**`/nen-sec`** ➔ İstediğin yaygın Nen türünü seçmeni sağlar.\n"
-        "**`/learn [teknik]`** ➔ Tekniği öğrenir.\n"
-        "**`/teknik-dagit`** ➔ Teknik puanlarını tekniklere dağıt.\n"
-        "**`/statcevir [miktar/hepsi]`** ➔ XP'yi stat puanına dönüştürür (100 XP = 1 Puan).\n"
-        "**`/stat-dagit`** ➔ Serbest stat puanlarını dağıtır.\n"
-        "**`/balance`** ➔ Cüzdanındaki Jenny'yi gösterir.\n"
-        "**`/pay [@oyuncu] [miktar]`** ➔ Para gönderir.\n"
-        "**`/leaderboard`** ➔ En güçlü Hunter'ları listeler.\n"
-        "**`/snipe [@kullanici]`** ➔ Son 5 mesajı gösterir (Sadece sana)."
+        "`/profil` ➔ Karakter kartını ve statlarını gösterir.\n"
+        "`/nen-spin` ➔ Şansa bağlı olarak Mütehassıs olma şansı verir (1 Hak).\n"
+        "`/nen-sec` ➔ İstediğin yaygın Nen türünü seçmeni sağlar.\n"
+        "`/learn [teknik]` ➔ Yeni bir teknik öğrenir.\n"
+        "`/teknik-dagit` ➔ Teknik puanlarını dağıtır.\n"
+        "`/statcevir` ➔ XP'yi stat puanına dönüştürür (100 XP = 1 Puan).\n"
+        "`/stat-dagit` ➔ Serbest stat puanlarını dağıtır.\n"
+        "`/balance` ➔ Cüzdanındaki Jenny miktarını gösterir.\n"
+        "`/pay` ➔ Başka bir oyuncuya para gönderir.\n"
+        "`/leaderboard` ➔ En güçlü oyuncuları listeler."
     ), inline=False)
-    embed.add_field(name="💡 NEN & XP SİSTEMİ", value=(
-        "• **Nen** statına puan dağıtınca her 1 Nen = **3 Teknik Puanı** kazanırsın.\n"
-        "• **Nen Havuzu** ayrı bir stat, normal stat puanıyla geliştirilir.\n"
-        "• **XP:** 150+ karakter = karakter başı **0.2 XP** (5 harf = 1 XP) | 149 ve altı = **0 XP**."
+    
+    embed.add_field(name="💡 SİSTEM BİLGİSİ", value=(
+        "• **Nen Puanı:** Bu stata puan verdiğinde her 1 Puan sana ekstra **3 Teknik Puanı** kazandırır.\n"
+        "• **XP Kazanımı:** 150 harf ve üzeri mesajlarda her 5 harf için 1 XP kazanırsın (150 harf = 30 XP, 155 harf = 31 XP şeklinde artar)."
     ), inline=False)
-    embed.add_field(name="🛡️ YETKİLİ KOMUTLARI (Admin)", value=(
-        "**`/kategori-ekle`** ➔ 10'a kadar kategori ekler.\n"
-        "**`/kategori-cikar`** ➔ 10'a kadar kategoriyi çıkarır.\n"
-        "**`/karakter-olustur`** ➔ Oyuncuya profil açar (15.000 Jenny başlangıç).\n"
-        "**`/karakter-duzenle`** ➔ Karakter bilgilerini günceller.\n"
-        "**`/stat-ayarla`** ➔ Statları doğrudan düzenler.\n"
-        "**`/admin nen-sifirla`** ➔ Nen türünü sıfırlar.\n"
-        "**`/admin profil-sifirla`** ➔ Profili tamamen siler.\n"
-        "**`/admin xp-give`** ➔ XP verir.\n"
-        "**`/admin nen-set`** ➔ Nen türünü manuel seçer.\n"
-        "**`/admin mastery-set`** ➔ Mastery ayarlar.\n"
-        "**`/admin teknik-puan-set`** ➔ Teknik puanını ayarlar.\n"
-        "**`/admin money-give`** ➔ Para ödülü verir."
+    
+    embed.add_field(name="🛡️ YETKİLİ KOMUTLARI", value=(
+        "`/kategori-ekle` ➔ XP kazanılacak kanalları belirler.\n"
+        "`/karakter-olustur` ➔ Oyuncuya profil açar (15.000 Jenny ile).\n"
+        "`/karakter-duzenle` ➔ Karakter bilgilerini günceller.\n"
+        "`/stat-ayarla` ➔ Statları doğrudan değiştirir.\n"
+        "`/admin ...` ➔ XP verme, para verme, sıfırlama komutlarıdır."
     ), inline=False)
+    
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="profil", description="Karakter profilini, Nen ve statlarını görüntüler.")
@@ -231,59 +227,46 @@ async def profil(interaction: discord.Interaction, kullanici: discord.Member = N
     total_stats = p["strength"] + p["speed"] + p["durability"] + p["willpower"] + p["nen_amount"] + p["nen_mastery"]
     unvan = "Nen Uykusunda" if total_stats < 20 else "Nen Acemisi" if total_stats < 100 else "Nen Ustası"
     nen_info = NEN_TYPES.get(p["nen_type"], {"emoji": "❓", "desc": "Bilinmiyor"})
+    
     techs = json.loads(p["techniques"])
     tech_levels = json.loads(p["technique_levels"]) if p.get("technique_levels") else {}
-    tech_str = ", ".join([f"{t}[{tech_levels.get(t, 0)}]" for t in techs]) if techs else "Henüz yok"
+    tech_str = ", ".join([f"{t} [Lv.{tech_levels.get(t, 0)}]" for t in techs]) if techs else "Henüz teknik öğrenilmedi."
 
-    embed = discord.Embed(color=discord.Color.dark_purple())
-    desc = f"""```text
-╔══════════════════════════════════════════════════════════════╗
-            ✦ DESTINY HxH | PROFİL: {p["character_name"]} ✦
-   Discord: @{target.display_name} | Unvan: {unvan}
-╠══════════════════════════════════════════════════════════════╣
- 📜 KİMLİK & NEN
- • Cinsiyet / Boy / Kilo: {p["gender"]} | {p["height"]} / {p["weight"]}
- • Nen Türü: {nen_info['emoji']} {p["nen_type"]} (Çevirme Hakkı: {1 - p["spin_count"]})
- • Mastery (Ustalık): {p["mastery"]} | Bakiye: {p["money"]} Jenny
- • Boştaki Stat Puanı: 🌟 {p["unassigned_stats"]} | Teknik Puanı: ✨ {p.get("technique_points", 0)}
+    # Çok daha profesyonel, temiz Discord Embed GUI'si (Telefon ve PC'de kusursuz görünür)
+    embed = discord.Embed(title=f"✦ {p['character_name']} ✦", description=f"Discord: {target.mention} | Unvan: **{unvan}**\n*XP: {int(p['current_xp'])} (Toplam: {int(p['total_earned_xp'])})*", color=discord.Color.blurple())
+    embed.set_thumbnail(url=target.display_avatar.url)
 
- ⚔️ FİZİKSEL STATLAR
- • 🥊 Güç:         [{p["strength"]:<3}]  {get_progress_bar(p["strength"])}
- • ⚡ Hız:         [{p["speed"]:<3}]  {get_progress_bar(p["speed"])}
- • 🛡️ Dayanıklılık: [{p["durability"]:<3}]  {get_progress_bar(p["durability"])}
+    embed.add_field(name="📜 Kimlik Bilgileri", value=f"**Cinsiyet:** {p['gender']}\n**Boy:** {p['height']}\n**Kilo:** {p['weight']}", inline=True)
+    embed.add_field(name="🌀 Nen Durumu", value=f"**Türü:** {nen_info['emoji']} {p['nen_type']}\n**Ustalık:** {p['mastery']}\n**Çevirme Hakkı:** {1 - p['spin_count']}", inline=True)
+    embed.add_field(name="💰 Ekonomi & Puan", value=f"**Bakiye:** {p['money']} Jenny\n**Boş Stat:** 🌟 {p['unassigned_stats']}\n**Teknik Puanı:** ✨ {p.get('technique_points', 0)}", inline=True)
 
- 🧠 NEN STATLARI
- • 👁️ Nen:         [{p["willpower"]:<3}]  {get_progress_bar(p["willpower"])}
- • 🌊 Nen Havuzu:   [{p["nen_amount"]:<3}]  {get_progress_bar(p["nen_amount"])}
- • 🌀 Nen Hakimiyeti:[{p["nen_mastery"]:<3}]  {get_progress_bar(p["nen_mastery"])}
-╠══════════════════════════════════════════════════════════════╣
- 📊 MEVCUT XP: {int(p["current_xp"])} XP (Toplam Kasılmış: {int(p["total_earned_xp"])})
- 📜 TEKNİKLER: {tech_str}
-╚══════════════════════════════════════════════════════════════╝
-```"""
-    embed.description = desc
+    embed.add_field(name="⚔️ Fiziksel Statlar", value=f"🥊 **Güç:** `{p['strength']:<3}` {get_progress_bar(p['strength'])}\n⚡ **Hız:** `{p['speed']:<3}` {get_progress_bar(p['speed'])}\n🛡️ **Dayanıklılık:** `{p['durability']:<3}` {get_progress_bar(p['durability'])}", inline=False)
+    embed.add_field(name="🧠 Nen Statları", value=f"👁️ **Nen:** `{p['willpower']:<3}` {get_progress_bar(p['willpower'])}\n🌊 **Nen Havuzu:** `{p['nen_amount']:<3}` {get_progress_bar(p['nen_amount'])}\n🌀 **Hakimiyet:** `{p['nen_mastery']:<3}` {get_progress_bar(p['nen_mastery'])}", inline=False)
+    embed.add_field(name="📖 Öğrenilen Teknikler", value=f"```{tech_str}```", inline=False)
+
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="nen-spin", description="Sadece %5 şansla Mütehassıs olmak için şansını dene. (1 Hak)")
+@bot.tree.command(name="nen-spin", description="Şansa bağlı olarak Mütehassıs olma şansını dene. (1 Hak)")
 async def nen_spin(interaction: discord.Interaction):
     p = await get_player(interaction.user.id, interaction.guild.id)
     if p["spin_count"] >= 1:
         return await interaction.response.send_message("❌ Nen çevirme hakkını kullandın (Maksimum 1 kez)!", ephemeral=True)
+    
     is_mutehassis = random.random() <= 0.05
     if is_mutehassis:
         await bot.db.execute("UPDATE players SET nen_type = ?, spin_count = 1 WHERE user_id = ? AND guild_id = ?",
                              ("Mütehassıs", interaction.user.id, interaction.guild.id))
         await bot.db.commit()
         info = NEN_TYPES["Mütehassıs"]
-        embed = discord.Embed(title="🎲 NEN TYPE SPIN - BAŞARILI!", color=discord.Color.gold())
-        embed.description = f"✨ **İnanılmaz! %5 şansı tutturdun ve MÜTEHASSIS oldun!**\n**Nen Türü:** {info['emoji']} **MÜTEHASSIS**\n📊 **Nadirlik:** {info['rarity']}\n📜 {info['desc']}"
+        embed = discord.Embed(title="🎲 NEN TÜRÜ - BAŞARILI!", color=discord.Color.gold())
+        embed.description = f"✨ **İnanılmaz! Şansın yaver gitti ve MÜTEHASSIS oldun!**\n\n**Nen Türü:** {info['emoji']} **MÜTEHASSIS**\n📊 **Nadirlik:** {info['rarity']}\n📜 {info['desc']}"
         await interaction.response.send_message(embed=embed)
     else:
         await bot.db.execute("UPDATE players SET spin_count = 1 WHERE user_id = ? AND guild_id = ?",
                              (interaction.user.id, interaction.guild.id))
         await bot.db.commit()
-        embed = discord.Embed(title="🎲 NEN TYPE SPIN - BAŞARISIZ", color=discord.Color.red())
-        embed.description = "❌ **Maalesef %5 şansı tutturamadın.**\nArtık `/nen-sec` ile temel 5 Nen türünden dilediğini seçebilirsin."
+        embed = discord.Embed(title="🎲 NEN TÜRÜ - BAŞARISIZ", color=discord.Color.red())
+        embed.description = "❌ **Maalesef şansın yaver gitmedi.**\nArtık `/nen-sec` komutu ile temel 5 Nen türünden dilediğini seçebilirsin."
         await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="nen-sec", description="İstediğin temel Nen türünü seç. (Sadece 1 kez)")
@@ -491,7 +474,7 @@ async def leaderboard(interaction: discord.Interaction):
     desc = "\n".join([f"**{i}.** <@{r['user_id']}> - **XP:** {int(r['current_xp'])}" for i, r in enumerate(rows, 1)])
     await interaction.response.send_message(embed=discord.Embed(title="🏆 Hunter Sıralaması", description=desc or "Kimse yok.", color=discord.Color.gold()))
 
-@bot.tree.command(name="snipe", description="Kullanıcının izinli kategorilerdeki son 5 mesajını gösterir (Sadece sana).")
+@bot.tree.command(name="snipe", description="İzinli kategorilerdeki son mesajları gösterir (Sadece sana).")
 async def snipe(interaction: discord.Interaction, kullanici: discord.Member):
     allowed = await get_allowed_categories(interaction.guild.id)
     if not allowed:
@@ -499,7 +482,7 @@ async def snipe(interaction: discord.Interaction, kullanici: discord.Member):
     mesajlar = snipe_cache[interaction.guild.id].get(kullanici.id, [])
     if not mesajlar:
         return await interaction.response.send_message(
-            f"❌ **{kullanici.display_name}** adlı kullanıcının bot açık olduğundan beri mesajı bulunamadı.",
+            f"❌ **{kullanici.display_name}** adlı kullanıcının silinmiş/son mesajı bulunamadı.",
             ephemeral=True
         )
     embed = discord.Embed(title=f"🔍 {kullanici.display_name} — Son {len(mesajlar)} Mesaj", color=discord.Color.blurple())
@@ -545,7 +528,7 @@ async def rol_ver(
     await bot.db.commit()
     await interaction.response.send_message(f"✅ Admin rolleri eklendi: **{', '.join(eklenenler)}**", ephemeral=True)
 
-@bot.tree.command(name="kategori-ekle", description="[Yetkili] XP kazanılacak çoklu kategori ekler (10'a kadar).")
+@bot.tree.command(name="kategori-ekle", description="[Yetkili] XP kazanılacak kategori ekler (10'a kadar).")
 @app_commands.default_permissions(administrator=True)
 async def kategori_ekle(
     interaction: discord.Interaction,
