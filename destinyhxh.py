@@ -35,6 +35,17 @@ TECHNIQUES = {
     "Ryu": {"desc": "Aura akışını anlık yönlendirme."}
 }
 
+# Gelişmiş tekniklerin gereksinimleri (Örn: Gyo öğrenmek için 50 Ren ve 50 Ten gerekir)
+ADVANCED_TECH_REQS = {
+    "Gyo": {"Ren": 50, "Ten": 50},
+    "In": {"Zetsu": 100, "Ten": 100},
+    "En": {"Ren": 150, "Ten": 150},
+    "Shu": {"Ten": 200},
+    "Ken": {"Ren": 250, "Ten": 250},
+    "Ko": {"Ten": 300, "Gyo": 100},
+    "Ryu": {"Ten": 350, "Ko": 50}
+}
+
 snipe_cache = defaultdict(lambda: defaultdict(list))
 
 class HxHBot(commands.Bot):
@@ -62,7 +73,6 @@ class HxHBot(commands.Bot):
             await self.db.execute("ALTER TABLE guild_settings ADD COLUMN admin_roles TEXT DEFAULT '[]'")
         except Exception:
             pass
-        # Başlangıç parasını direkt DB seviyesinde 15000 yaptık
         await self.db.execute('''CREATE TABLE IF NOT EXISTS players (
             user_id INTEGER,
             guild_id INTEGER,
@@ -172,7 +182,6 @@ async def on_message(message: discord.Message):
 
     msg_len = len(message.content)
 
-    # 150 ve üstü için her 5 karaktere 1 XP (150 = 30XP, 155 = 31XP, sonsuza kadar artar)
     if msg_len >= 150:
         xp_gained = round(msg_len * 0.2, 1)
     else:
@@ -203,6 +212,7 @@ async def bilgi(interaction: discord.Interaction):
     
     embed.add_field(name="💡 SİSTEM BİLGİSİ", value=(
         "• **Nen Puanı:** Bu stata puan verdiğinde her 1 Puan sana ekstra **3 Teknik Puanı** kazandırır.\n"
+        "• **Gelişmiş Teknikler:** Bir gelişmiş tekniğin seviyesi, bağlı olduğu alt tekniklerin seviyesini geçemez.\n"
         "• **XP Kazanımı:** 150 harf ve üzeri mesajlarda her 5 harf için 1 XP kazanırsın (150 harf = 30 XP, 155 harf = 31 XP şeklinde artar)."
     ), inline=False)
     
@@ -232,7 +242,6 @@ async def profil(interaction: discord.Interaction, kullanici: discord.Member = N
     tech_levels = json.loads(p["technique_levels"]) if p.get("technique_levels") else {}
     tech_str = ", ".join([f"{t} [Lv.{tech_levels.get(t, 0)}]" for t in techs]) if techs else "Henüz teknik öğrenilmedi."
 
-    # Çok daha profesyonel, temiz Discord Embed GUI'si (Telefon ve PC'de kusursuz görünür)
     embed = discord.Embed(title=f"✦ {p['character_name']} ✦", description=f"Discord: {target.mention} | Unvan: **{unvan}**\n*XP: {int(p['current_xp'])} (Toplam: {int(p['total_earned_xp'])})*", color=discord.Color.blurple())
     embed.set_thumbnail(url=target.display_avatar.url)
 
@@ -295,47 +304,79 @@ async def learn_technique(interaction: discord.Interaction, teknik: str):
     t_name = teknik.capitalize()
     if t_name not in TECHNIQUES:
         return await interaction.response.send_message(f"❌ Bilinmeyen teknik! Teknikler: {', '.join(TECHNIQUES.keys())}", ephemeral=True)
+    
     p = await get_player(interaction.user.id, interaction.guild.id)
     techs = json.loads(p["techniques"])
+    tech_levels = json.loads(p["technique_levels"]) if p.get("technique_levels") else {}
+
     if t_name in techs:
         return await interaction.response.send_message("⚠️ Bu tekniği zaten biliyorsun.", ephemeral=True)
+
+    # Gelişmiş teknik öğrenme alt seviye kontrolü
+    if t_name in ADVANCED_TECH_REQS:
+        for req_tech, req_lvl in ADVANCED_TECH_REQS[t_name].items():
+            current_req_lvl = tech_levels.get(req_tech, 0)
+            if current_req_lvl < req_lvl:
+                return await interaction.response.send_message(
+                    f"❌ **{t_name}** tekniğini öğrenmek için en az **{req_lvl} {req_tech}** seviyesine ulaşmalısın! (Mevcut {req_tech}: {current_req_lvl})", 
+                    ephemeral=True
+                )
+
     techs.append(t_name)
-    tech_levels = json.loads(p["technique_levels"]) if p.get("technique_levels") else {}
     tech_levels[t_name] = 0
     await bot.db.execute("UPDATE players SET techniques = ?, technique_levels = ? WHERE user_id = ? AND guild_id = ?",
                          (json.dumps(techs), json.dumps(tech_levels), interaction.user.id, interaction.guild.id))
     await bot.db.commit()
-    await interaction.response.send_message(f"🎉 **{t_name}** tekniğini öğrendin! `/teknik-dagit` ile puan verebilirsin.")
+    await interaction.response.send_message(f"🎉 **{t_name}** tekniğini başarıyla öğrendin! `/teknik-dagit` ile geliştirebilirsin.")
 
 class TeknikModal(discord.ui.Modal, title='Teknik Puanı Dağıt'):
     amount = discord.ui.TextInput(label='Eklenecek Puan', style=discord.TextStyle.short, placeholder='Örn: 5', required=True)
+    
     def __init__(self, teknik_adi, mevcut_puan):
         super().__init__()
         self.teknik_adi = teknik_adi
         self.mevcut_puan = mevcut_puan
+        
     async def on_submit(self, interaction: discord.Interaction):
         try:
             val = int(self.amount.value)
         except ValueError:
             return await interaction.response.send_message("❌ Geçersiz sayı.", ephemeral=True)
+        
         if val <= 0:
             return await interaction.response.send_message("❌ 0'dan büyük bir değer gir.", ephemeral=True)
+        
         p = await get_player(interaction.user.id, interaction.guild.id)
         teknik_puani = p.get("technique_points", 0)
+        
         if val > teknik_puani:
             return await interaction.response.send_message(f"❌ Yetersiz teknik puanı! Mevcut: {teknik_puani}", ephemeral=True)
+        
         techs = json.loads(p["techniques"])
         if self.teknik_adi not in techs:
             return await interaction.response.send_message("❌ Bu tekniği bilmiyorsun.", ephemeral=True)
+        
         tech_levels = json.loads(p["technique_levels"]) if p.get("technique_levels") else {}
-        tech_levels[self.teknik_adi] = tech_levels.get(self.teknik_adi, 0) + val
+        new_level = tech_levels.get(self.teknik_adi, 0) + val
+
+        # Gelişmiş tekniğin seviyesi, alt tekniklerin seviyesini geçemez.
+        if self.teknik_adi in ADVANCED_TECH_REQS:
+            for req_tech in ADVANCED_TECH_REQS[self.teknik_adi].keys():
+                current_req_lvl = tech_levels.get(req_tech, 0)
+                if current_req_lvl < new_level:
+                    return await interaction.response.send_message(
+                        f"❌ **{self.teknik_adi}** seviyesini `{new_level}` yapamazsın. Alt tekniği olan **{req_tech}** da en az `{new_level}` olmalı! (Şu anki {req_tech}: {current_req_lvl})", 
+                        ephemeral=True
+                    )
+
+        tech_levels[self.teknik_adi] = new_level
         await bot.db.execute(
             "UPDATE players SET technique_points = technique_points - ?, technique_levels = ? WHERE user_id = ? AND guild_id = ?",
             (val, json.dumps(tech_levels), interaction.user.id, interaction.guild.id)
         )
         await bot.db.commit()
         await interaction.response.send_message(
-            f"✅ **{self.teknik_adi}** tekniğine `{val}` puan verildi! Yeni seviye: **{tech_levels[self.teknik_adi]}**",
+            f"✅ **{self.teknik_adi}** tekniğine `{val}` puan verildi! Yeni seviye: **{new_level}**",
             ephemeral=True
         )
 
